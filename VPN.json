@@ -1,0 +1,207 @@
+{
+    "$schema": "https://schema.management.azure.com/schemas/2019-04-01/deploymentTemplate.json#",
+    "contentVersion": "1.0.0.0",
+    "parameters": {
+        "VNET Name": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the Virtual network name"
+            }
+        },
+        "Subnet Name": {
+            "type": "string",
+            "defaultValue": "GatewaySubnet"
+
+        },
+        "VNET Address Prefix": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the VNET address range"
+            }
+        },
+        "GatewaySubnet Address Prefix": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the GatewaySubnet address range. The Minimum should be /27"
+            }
+        },
+        "VPN Gateway VIP": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the VPN Gateway Public IP name"
+            }
+        },
+        "VPN Gateway Name": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the VPN Gateway name"
+            }
+        },
+        "VPN Gateway SKU": {
+            "type": "string",
+            "metadata": {
+                "description": "Select the VPN Gateway SKU"
+            },
+            "allowedValues": [
+                "Basic",
+                "VPNGw1"
+            ]
+        },
+        "VPN Gateway DNS name": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the unique dns value"
+            }
+        },
+        "LNG Name": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the Local Network Gateway Name"
+            }
+        },
+        "On-Prem Address Prefix": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the On-Premises Address prefix"
+            }
+        },
+        "On-Prem Gateway IP": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the On-Premises Gateway IP Address"
+            }
+        },
+        "Connection name": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the VPN connection name"
+            }
+        },
+        "Shared Key": {
+            "type": "string",
+            "metadata": {
+                "description": "Enter the pre-shared key"
+            }
+        }
+        
+    },
+    "functions": [],
+    "variables": {},
+    "resources": [ 
+        {
+            "name": "[parameters('VNET Name')]",
+            "type": "Microsoft.Network/virtualNetworks",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[parameters('VNET Name')]"
+            },
+            "properties": {
+                "addressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('VNET Address Prefix')]"
+                    ]
+                },
+                "subnets": [
+                    {
+                        "name": "[parameters('Subnet Name')]",
+                        "properties": {
+                            "addressPrefix": "[parameters('GatewaySubnet Address Prefix')]"
+                        }
+                    }
+                ]
+            }
+        },
+        {
+            "name": "[parameters('VPN Gateway VIP')]",
+            "type": "Microsoft.Network/publicIPAddresses",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "tags": {
+                "displayName": "[parameters('VPN Gateway VIP')]"
+            },
+            "properties": {
+                "publicIPAllocationMethod": "Dynamic",
+                "dnsSettings": {
+                    "domainNameLabel": "[parameters('VPN Gateway DNS name')]"
+                }
+            }
+        },
+        
+        {
+            "name": "[parameters('VPN Gateway Name')]",
+            "type": "Microsoft.Network/virtualNetworkGateways",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/publicIPAddresses', parameters('VPN Gateway VIP'))]",
+                "[resourceId('Microsoft.Network/virtualNetworks', parameters('VNET Name'))]"
+            ],
+            "properties": {
+                "ipConfigurations": [
+                    {
+                        "name": "vnetGatewayConfig",
+                        "properties": {
+                            "privateIPAllocationMethod": "Dynamic",
+                            "subnet": {
+                                "id": "[resourceId('Microsoft.Network/virtualNetworks/subnets', parameters('VNET Name'), parameters('Subnet Name'))]"
+                            },
+                            "publicIPAddress": {
+                                "id": "[resourceId('Microsoft.Network/publicIPAddresses', parameters('VPN Gateway VIP'))]"
+                            }
+                        }
+                    }
+                ],
+                "sku": {
+                    "name": "[parameters('VPN Gateway SKU')]",
+                    "tier": "[parameters('VPN Gateway SKU')]"
+                },
+                "gatewayType": "Vpn",
+                "vpnType": "Policybased"
+            }
+        },
+  
+        {
+            "name": "[parameters('LNG Name')]",
+            "type": "Microsoft.Network/localNetworkGateways",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "properties": {
+                "localNetworkAddressSpace": {
+                    "addressPrefixes": [
+                        "[parameters('On-Prem Address Prefix')]"
+                    ]
+                },
+                "gatewayIpAddress": "[parameters('On-Prem Gateway IP')]"
+            }
+        },
+        {
+            "name": "[parameters('Connection name')]",
+            "type": "Microsoft.Network/connections",
+            "apiVersion": "2019-11-01",
+            "location": "[resourceGroup().location]",
+            "dependsOn": [
+                "[resourceId('Microsoft.Network/virtualNetworkGateways', parameters('VPN Gateway Name'))]",
+                "[resourceId('Microsoft.Network/localNetworkGateways', parameters('LNG Name'))]"
+            ],
+            "properties": {
+                "virtualNetworkGateway1": {
+                    "id": "[resourceId('Microsoft.Network/virtualNetworkGateways', parameters('VPN Gateway Name'))]"
+                },
+                "localNetworkGateway2": {
+                    "id": "[resourceId('Microsoft.Network/localNetworkGateways', parameters('LNG Name'))]"
+                },
+                "connectionType": "IPsec",
+                "routingWeight": 0,
+                "sharedKey": "[parameters('Shared Key')]"
+            }
+        }
+
+    ],
+    "outputs": {
+        "output1": {
+            "type": "string",
+            "value": "VPN Site-to-Site created Successfuly. Kindly validate the connectivity."
+        }
+    }
+}
